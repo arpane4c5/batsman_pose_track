@@ -40,11 +40,75 @@ def getImageFromName(DATASET, pose_fname):
     if not ret:
         print("Frame not read !!")
         return 
-    
-    plt.figure()
-    plt.imshow(img)
+#    
+#    plt.figure()
+#    plt.imshow(img)
     cap.release()
     return img
+
+        
+def plotPerson(img, pose_kp, people_ordering):
+    colorlist=[[255,255,255],[255,0,0],[0,255,0],[0,0,255],[255,255,0],[0,255,255],[255,0,255],[0,128,128],[0,0,0]]
+    '''
+    img: input image RGB
+    pose_kp: dictionary formed by openpose for the corresponding image
+    '''
+    people = pose_kp['people']
+    nPeople = len(people)
+    people_ordering_new = []
+    for o,p in enumerate(people):
+        person_pose_vals = p['pose_keypoints_2d']   # get list of values (x1, y1 ,c1, x2, y2, c2 ...)
+        s=people_ordering[o]
+        people_ordering_new.append(s)
+        i=0
+        a=colorlist[s][i]
+        b=colorlist[s][i+1]
+        c=colorlist[s][i+2]
+        for j in range(0, len(person_pose_vals), 3):
+            x = int(person_pose_vals[j])
+            y = int(person_pose_vals[j+1])
+            c = person_pose_vals[j+2]
+            
+            img[(y-2):(y+2),(x-2):(x+2),:] = (a,b,c)  # do white
+        
+        #break  # remove to display for all the persons in the image
+        
+#    plt.figure()
+#    plt.imshow(img)
+    #return img
+    return people_ordering_new
+
+def mapping(pose_img1, pose_img2, arr):
+        a=len(pose_img1['people'])
+        b=len(pose_img2['people'])
+        print(a)
+        print(b)
+        arr_map=[]
+        
+        for p in range(b):
+            mini=10**1000
+            
+            for q in range(a):
+                sums=0
+                
+                for r in range(0,75,3):
+                    x2=pose_img2['people'][p]['pose_keypoints_2d'][r]
+                    y2=pose_img2['people'][p]['pose_keypoints_2d'][r+1]
+                    x1=pose_img1['people'][q]['pose_keypoints_2d'][r]
+                    y1=pose_img1['people'][q]['pose_keypoints_2d'][r+1]
+                    p1=np.array((x1,y1))
+                    p2=np.array((x2,y2))
+                    dist= np.linalg.norm(p2-p1)
+                    sums= np.add(sums,dist)
+
+                if(min(mini,sums)==sums):
+                    mini=sums
+                    s=q
+            m=arr[s]
+            arr_map.append(m)
+            
+        return arr_map
+
 
 def plotPoseKeyPoints(img, pose_kp):
     '''
@@ -67,7 +131,26 @@ def plotPoseKeyPoints(img, pose_kp):
         
     return img
 
-
+def getPoseVector(pose_kp):
+    """
+    Receives the pose dictionary and returns the person keypoints as a vector
+    """
+    people = pose_kp['people']
+    people_list = []
+    for i, p in enumerate(people):
+        person_pose_vals = p['pose_keypoints_2d']   # get list of values (x1, y1 ,c1, x2, y2, c2 ...)
+        people_list.append(person_pose_vals)
+#        for j in range(0, len(person_pose_vals), 3):
+#            x = int(person_pose_vals[j])
+#            y = int(person_pose_vals[j+1])
+#            c = person_pose_vals[j+2]
+#            #print(x,y,c)
+#            img[(y-2):(y+2),(x-2):(x+2),:] = 255  # do white
+        
+        #break  # remove to display for all the persons in the image
+        
+    return np.array(people_list)      # return 2D matrix persons 
+    
 
 
 def extract_all(srcFolderPath, destFolderPath, onGPU=True, stop='all'):
@@ -265,3 +348,4 @@ def getPoseFeats(DATASET, POSE_FEATS, videoName, onGPU):
     cap.release()
     #return features_current_file
     #return np.array(features_current_file)      # convert to (N-depth+1) x 1 x 4096
+
