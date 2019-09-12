@@ -18,6 +18,14 @@ import matplotlib.pyplot as plt
 from joblib import Parallel, delayed
 
 
+_WHITE = (255, 255, 255)
+_GREEN = (18, 127, 15)
+_RED = (240, 15, 15)
+
+person_colors=[[255,255,255],[255,0,0],[0,255,0],[0,0,255],[255,255,0], 
+                   [0,255,255],[255,0,255],[0,128,128],[0,0,0]]
+NCOLORS = len(person_colors)
+
 # Split the dataset files into training, validation and test sets
 # All video files present at the same path (assumed)
 def split_dataset_files(datasetPath):
@@ -28,7 +36,8 @@ def split_dataset_files(datasetPath):
 
 # function to get the image from the video for the corresponding json file
 def getImageFromName(DATASET, pose_fname):
-    vNameFrame = pose_fname.rsplit('.',1)[0].rsplit('_', 2)   # get a list with 0 index as vName and 1 index as Frame No.
+    # get a list with 0 index as vName and 1 index as Frame No.
+    vNameFrame = pose_fname.rsplit('.',1)[0].rsplit('_', 2)   
     vName = vNameFrame[0]+'.avi'
     vFrameNo = int(vNameFrame[1])
     cap = cv2.VideoCapture(os.path.join(DATASET, vName))
@@ -46,30 +55,92 @@ def getImageFromName(DATASET, pose_fname):
     cap.release()
     return img
 
-        
-def plotPerson(img, pose_kp, people_ordering):
-    colorlist=[[255,255,255],[255,0,0],[0,255,0],[0,0,255],[255,255,0],[0,255,255],[255,0,255],[0,128,128],[0,0,0]]
+
+def plotPersonFromMatrix(img, poses, people_ordering):
     '''
     img: input image RGB
-    pose_kp: dictionary formed by openpose for the corresponding image
+    pose_kp: 2D matrix of N_persons X 75 .
     '''
-    people = pose_kp['people']
-    nPeople = len(people)
+    
+    nPeople = poses.shape[0]
     people_ordering_new = []
-    for o,p in enumerate(people):
-        person_pose_vals = p['pose_keypoints_2d']   # get list of values (x1, y1 ,c1, x2, y2, c2 ...)
-        s=people_ordering[o]
+    for pid in range(nPeople):
+        person_pose_vals = poses[pid, :]    # get vector of shape (75,)
+        s=people_ordering[pid]
         people_ordering_new.append(s)
-        i=0
-        a=colorlist[s][i]
-        b=colorlist[s][i+1]
-        c=colorlist[s][i+2]
+        p_col = person_colors[s]
         for j in range(0, len(person_pose_vals), 3):
             x = int(person_pose_vals[j])
             y = int(person_pose_vals[j+1])
             c = person_pose_vals[j+2]
             
-            img[(y-2):(y+2),(x-2):(x+2),:] = (a,b,c)  # do white
+            img[(y-2):(y+2),(x-2):(x+2),:] = p_col  # do white
+        
+        #break  # remove to display for all the persons in the image
+        
+#    plt.figure()
+#    plt.imshow(img)
+    #return img
+    return people_ordering_new
+
+def plotPersonBoundingBoxes(img, poses_bboxes, people_ordering, box_thickness=1):
+    '''
+    img: input image RGB
+    poses: 2D matrix of bounding boxes of size N_persons X 4 .
+    people_ordering: sequence of non-negative integers denoting N_persons
+    '''
+    nPeople = poses_bboxes.shape[0]
+    people_ordering_new = []
+    for pid in range(nPeople):
+        person_pose = poses_bboxes[pid, :]    # get vector of shape (75,)
+        s=people_ordering[pid]
+        
+        people_ordering_new.append(s)
+        p_col = person_colors[s%NCOLORS]
+        x0, y0 = person_pose[0], person_pose[1]
+        x1, y1 = person_pose[2], person_pose[3]
+        #print("Person : {} x:".format(pid), x_pose_points)
+        #print("Person : {} y:".format(pid), y_pose_points)
+        cv2.rectangle(img, (x0, y0), (x1, y1), p_col, \
+                      thickness=box_thickness)
+        
+    return people_ordering_new
+    
+def highlight_selected_box(img, poses_bboxes, people_ordering, refpt):
+    
+    for pid in range(poses_bboxes.shape[0]):
+        person_pose = poses_bboxes[pid, :]    # get vector of shape (75,)
+        s = people_ordering[pid]
+        p_col = person_colors[s%NCOLORS]
+        x0, y0 = person_pose[0], person_pose[1]
+        x1, y1 = person_pose[2], person_pose[3]
+        if refpt[0]>=x0 and refpt[0]<=x1:
+            if refpt[1]>=y0 and refpt[1]<=y1:
+                cv2.rectangle(img, (x0, y0), (x1, y1), p_col, thickness=3)
+                break
+            
+    #return ()
+    
+
+def plotPerson(img, pose_kp, people_ordering):
+    '''
+    img: input image RGB
+    pose_kp: dictionary formed by openpose for the corresponding image
+    '''
+    people = pose_kp['people']
+    people_ordering_new = []
+    for o,p in enumerate(people):
+        # get list of values (x1, y1 ,c1, x2, y2, c2 ...)
+        person_pose_vals = p['pose_keypoints_2d']   
+        s=people_ordering[o]
+        people_ordering_new.append(s)
+        p_col = person_colors[s%NCOLORS]
+        for j in range(0, len(person_pose_vals), 3):
+            x = int(person_pose_vals[j])
+            y = int(person_pose_vals[j+1])
+            c = person_pose_vals[j+2]
+            
+            img[(y-2):(y+2),(x-2):(x+2),:] = p_col  # do white
         
         #break  # remove to display for all the persons in the image
         
@@ -118,7 +189,8 @@ def plotPoseKeyPoints(img, pose_kp):
     people = pose_kp['people']
     
     for i, p in enumerate(people):
-        person_pose_vals = p['pose_keypoints_2d']   # get list of values (x1, y1 ,c1, x2, y2, c2 ...)
+        # get list of values (x1, y1 ,c1, x2, y2, c2 ...)
+        person_pose_vals = p['pose_keypoints_2d']   
         
         for j in range(0, len(person_pose_vals), 3):
             x = int(person_pose_vals[j])
@@ -138,19 +210,32 @@ def getPoseVector(pose_kp):
     people = pose_kp['people']
     people_list = []
     for i, p in enumerate(people):
-        person_pose_vals = p['pose_keypoints_2d']   # get list of values (x1, y1 ,c1, x2, y2, c2 ...)
+        # get list of values (x1, y1 ,c1, x2, y2, c2 ...)
+        person_pose_vals = p['pose_keypoints_2d']   
         people_list.append(person_pose_vals)
-#        for j in range(0, len(person_pose_vals), 3):
-#            x = int(person_pose_vals[j])
-#            y = int(person_pose_vals[j+1])
-#            c = person_pose_vals[j+2]
-#            #print(x,y,c)
-#            img[(y-2):(y+2),(x-2):(x+2),:] = 255  # do white
-        
-        #break  # remove to display for all the persons in the image
         
     return np.array(people_list)      # return 2D matrix persons 
     
+def getPoseBBoxes(pose_kp):
+    """
+    Receives the pose dictionary and returns the person bboxes as a matrix of size
+    (N_Persons X 4)
+    """
+    people = pose_kp['people']
+    people_list = []
+    for i, p in enumerate(people):
+        # get list of values (x1, y1 ,c1, x2, y2, c2 ...)
+        person_pose = p['pose_keypoints_2d']   
+        x_pose_points = [int(person_pose[j]) for j in range(0, len(person_pose), 3) \
+                             if int(person_pose[j])!=0]
+        y_pose_points = [int(person_pose[j]) for j in range(1, len(person_pose), 3) \
+                             if int(person_pose[j])!=0]
+        x0, y0 = min(x_pose_points), min(y_pose_points)
+        x1, y1 = max(x_pose_points), max(y_pose_points)
+        
+        people_list.append([x0, y0, x1, y1])
+        
+    return np.array(people_list)      # return 2D matrix persons BBoxes
 
 
 def extract_all(srcFolderPath, destFolderPath, onGPU=True, stop='all'):
@@ -184,7 +269,8 @@ def extract_all(srcFolderPath, destFolderPath, onGPU=True, stop='all'):
             
     # iterate over the video files inside the directory sf
     for vid in vfiles:
-        if os.path.isfile(os.path.join(srcFolderPath, vid)) and vid.rsplit('.', 1)[1] in {'avi', 'mp4'}:
+        if os.path.isfile(os.path.join(srcFolderPath, vid)) and \
+                                    vid.rsplit('.', 1)[1] in {'avi', 'mp4'}:
             infiles.append(os.path.join(srcFolderPath, vid))
             outfiles.append(os.path.join(destFolderPath, vid.rsplit('.', 1)[0]+".npy"))
             nFrames.append(getTotalFramesVid(os.path.join(srcFolderPath, vid)))
@@ -284,8 +370,8 @@ def getPoseFeats(DATASET, POSE_FEATS, videoName, onGPU):
     """
     Function to read all the frames of the video and get sequence of features
      one batch at a time. 
-    This function can be called parallely called based on the amount of 
-    memory available.
+    This function can be called parallely based on the amount of available
+    memory.
     
     Parameters:
     ------
@@ -321,7 +407,8 @@ def getPoseFeats(DATASET, POSE_FEATS, videoName, onGPU):
         ret, curr_frame = cap.read()    # H x W x C
         if not ret:
             break
-        poseFile = os.path.join(POSE_FEATS, prefix+'_{:012}'.format(frameCount)+'_keypoints.json')
+        poseFile = os.path.join(POSE_FEATS, prefix+'_{:012}'.format(frameCount)+\
+                                '_keypoints.json')
         if not os.path.exists(poseFile):
             print("File does not exist !! {}".format(frameCount))
             frameCount +=1
@@ -349,3 +436,13 @@ def getPoseFeats(DATASET, POSE_FEATS, videoName, onGPU):
     #return features_current_file
     #return np.array(features_current_file)      # convert to (N-depth+1) x 1 x 4096
 
+
+#def showPersonBBox(img, bbox, thick=1):
+#    """
+#    Taken from detectron vis_bbox in utils/vis.py 
+#    """
+#    (x0, y0, w, h) = bbox
+#    x1, y1 = int(x0+w), int(y0+h)
+#    x0, y0 = int(x0), int(y0)
+#    cv2.rectangle(img, (x0, y0), (x1, y1), _RED, thickness=thick)
+#    return img

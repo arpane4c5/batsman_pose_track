@@ -83,6 +83,24 @@ class VideoPoseTrack:
         
         print("Read keypoint vectors")
         return self.vid_persons
+    
+    def getPoseBBoxes(self):
+        """
+        return the list of pose bounding box vectors for the video. 
+        For N frames, get N matrices of shape (n_persons_in_frame, 4), 
+        where 4 is the sequence of (x0, y0, x1, y1) coordinates.
+        """
+        self.vid_persons_bboxes = []
+        for i in range(self.nFrames):
+            poseFile = self.srcVid.rsplit(".", 1)[0]+"_{:012}".format(i)+"_keypoints.json"
+            poseFile = os.path.join(self.posesPath, poseFile)
+            with open(poseFile, 'r') as fp:
+                frame_persons_list = json.load(fp)
+            # form a list of 2D matrices.
+            self.vid_persons_bboxes.append(utils.getPoseBBoxes(frame_persons_list))
+        
+        print("Read keypoint vectors")
+        return self.vid_persons_bboxes
         
     def disambiguatePersons(self):
         """
@@ -105,35 +123,59 @@ class VideoPoseTrack:
 #                if start:
 #                    #assign new labels
                     
-                            
         
     def visualizeVideoWithPoses(self):
         """
         Visualize by plotting the points in the frames.
         """
+        global refpt, clicked
         #Iterate over the strokes
         for start, end in self.strokes:
-            for i in range(start, end+1):
+            i = start
+            while i<=end:
                 poseFile = self.srcVid.rsplit(".", 1)[0]+"_{:012}".format(i)+"_keypoints.json"
                 # read the image from the datasetPath only using poseFile name
                 img=utils.getImageFromName(self.datasetPath, poseFile)
-                # read the poses from JSON
-                with open(os.path.join(self.posesPath, poseFile), 'r') as fp:
-                    pose_img = json.load(fp)
-                people_ordering = list(range(len(pose_img['people'])))
-                people_ordering = utils.plotPerson(img, pose_img, people_ordering)
+                assert hasattr(self, 'vid_persons_bboxes'), "Execute getPoseFeatures()"
+#                # read the poses from JSON
+#                with open(os.path.join(self.posesPath, poseFile), 'r') as fp:
+#                    pose_img = json.load(fp)
+                people_ordering = list(range(len(self.vid_persons_bboxes)))
+#                people_ordering = utils.plotPersonFromMatrix(img, \
+#                                        self.vid_persons[i], people_ordering)
+                people_ordering = utils.plotPersonBoundingBoxes(img, \
+                                        self.vid_persons_bboxes[i], people_ordering, 1)
+                
+                cv2.namedWindow("Poses")
                 cv2.imshow("Poses", img)
-                direction = waitTillEscPressed()
-                if direction == 1:
-                    start +=1
-                elif direction == 0:
-                    start -=1
-                elif direction == 2:
-                    break
-                elif direction == 3:
-                    break
+                while(True):
+                
+                    cv2.setMouseCallback("Poses", get_click_coordinates)
+                    
+                    # get the box corresponding to the click coordinates
+                    if clicked:
+                        box = utils.highlight_selected_box(img, self.vid_persons_bboxes[i],\
+                                                 people_ordering, refpt)
+                        print("Box : {}".format(box))
+                        clicked = False
+                        cv2.imshow("Poses", img)
+                    
+                    # For moving forward
+                    if cv2.waitKey(0)==27:
+                        print("Esc Pressed. Move Forward.")
+                        i+=1
+                        break
+                
+#                direction = waitTillEscPressed()
+#                if direction == 1:
+#                    i +=1
+#                elif direction == 0:
+#                    i -=1
+#                elif direction == 2:
+#                    break
+#                elif direction == 3:
+#                    break
 
-#            print(img.shape)     #for the first frame in every shot
 #            
 #            for l in range(j,k):           #tracking starts
 #                print(l)
@@ -159,6 +201,18 @@ class VideoPoseTrack:
         
         pass
 
+refpt, clicked = None, False
+def get_click_coordinates(event, x, y, flags, param):
+    # grab references to the global variables
+    global refpt, clicked
+    # if the left mouse button was pressed or released, record (x, y) coordinates 
+    if event == cv2.EVENT_LBUTTONDOWN or event == cv2.EVENT_LBUTTONUP:
+        refpt = (x, y)
+        print("coordinates : {}".format((x,y)))
+        clicked = True
+        # draw a rectangle around the region of interest
+        #cv2.rectangle(image, refPt[0], refPt[1], (0, 255, 0), 2)
+        #cv2.imshow("image", image)
 
 def waitTillEscPressed():
     while(True):
@@ -208,7 +262,9 @@ if __name__ == '__main__':
     
     # Create object for one video only
     v = VideoPoseTrack(DATASET, train_lst[0]+".avi", POSE_FEATS, tr_labs[0])
-    vid_poses = v.getPoseFeatures()
+    vid_poses = v.getPoseBBoxes()
+    v.visualizeVideoWithPoses()
+    
     
 
     
