@@ -1,2 +1,13 @@
 output_json/
 __pycache__/
+.ipynb_checkpoints/
+output_json.tar.gz
+output_pose_main_*/
+output_pose_main_*.tar.gz
+batsman_pose_gt/
+pose_action_ipynb/logs/
+ICC_WT20_frames/
+pose_action_ipynb/PennFudanPed/
+pose_action_ipynb/PennFudanPed.zip
+pose_action_ipynb/__pycache__/
+pose_action_ipynb/vision-master/

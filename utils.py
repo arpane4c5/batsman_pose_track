@@ -114,12 +114,12 @@ def highlight_selected_box(img, poses_bboxes, people_ordering, refpt):
         p_col = person_colors[s%NCOLORS]
         x0, y0 = person_pose[0], person_pose[1]
         x1, y1 = person_pose[2], person_pose[3]
-        if refpt[0]>=x0 and refpt[0]<=x1:
-            if refpt[1]>=y0 and refpt[1]<=y1:
-                cv2.rectangle(img, (x0, y0), (x1, y1), p_col, thickness=3)
-                break
+        if (refpt[0]>=x0 and refpt[0]<=x1) and (refpt[1]>=y0 and refpt[1]<=y1):
+            cv2.rectangle(img, (x0, y0), (x1, y1), p_col, thickness=3)
+        else:
+            cv2.rectangle(img, (x0, y0), (x1, y1), p_col, thickness=1)
             
-    #return ()
+    return (x0, y0, x1, y1)
     
 
 def plotPerson(img, pose_kp, people_ordering):
