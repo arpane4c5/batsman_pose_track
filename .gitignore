@@ -11,3 +11,6 @@ pose_action_ipynb/PennFudanPed/
 pose_action_ipynb/PennFudanPed.zip
 pose_action_ipynb/__pycache__/
 pose_action_ipynb/vision-master/
+*.mpg
+*.mp4
+
