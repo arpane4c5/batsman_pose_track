@@ -272,7 +272,6 @@ def convertPoseVecsToBBoxes(person_kp_mat):
         
     return np.array(people_list)      # return 2D matrix persons BBoxes
 
-
 def get_next_mapping(p1, p2, pid1, next_pid=0, epsilon=20):
     '''Find the next mapping of poses in current frame corresponding to the previous 
     frame mapping.
@@ -315,7 +314,54 @@ def get_next_mapping(p1, p2, pid1, next_pid=0, epsilon=20):
         
     return list(pid2)
 
+def get_track2frame(stroke_tracks):
+    '''Receive a list of lists corresponding to the poses in each frame of a 
+    stroke and convert to a track_id/pose_id to frame no list. The length of 
+    the list gives the length of the pose track.
+    Parameters:
+    -----------
+    stroke_tracks : list of list
+        The sublists contain pose ids in each frame of the stroke.
+        
+    Returns:
+    --------
+    dict with key as pose_ids and values as list of frames_nos with tracks
+    eg., {pose_id1 : [f1, f2, f3, ...], ...} 
+    
+    '''
+    track2frame = {}
+    for frm_no, frm_poses in  enumerate(stroke_tracks):
+        for pid in frm_poses:
+            if pid not in track2frame:
+                track2frame[pid] = [frm_no]
+            else:
+                track2frame[pid].append(frm_no)
+    return track2frame
 
+def normalize_pose(p):
+    '''
+    '''
+    
+    if p.shape[-1] == 0:
+        return p
+    
+    shift = 2
+    if p.shape[-1] == 75:
+        shift = 3
+    
+    # operate on only x coordinate values
+    p[:, ::shift] = p[:, ::shift] - np.min(p[:, ::shift], axis=1)[:, None]
+    # operate on only y corrdinate values
+    p[:, 1::shift] = p[:, 1::shift] - np.min(p[:, 1::shift], axis=1)[:, None]
+    # calculate box widths and heights
+    bb_wd = (np.max(p[:, ::shift], axis=1) - np.min(p[:, ::shift], axis=1))[:, None]
+    bb_ht = (np.max(p[:, 1::shift], axis=1) - np.min(p[:, 1::shift], axis=1))[:, None]
+    # divide by box widths and heights
+    p[:, ::shift] = p[:, ::shift] / bb_wd
+    p[:, ::shift] = p[:, 1::shift] / bb_ht
+    
+    return p
+        
 def waitTillEscPressed():
     '''
     Supporting method for visualizing output frame by frame, continuing as keystrokes

@@ -15,6 +15,10 @@ import json
 import cv2
 import numpy as np
 from utils import track_utils as utils
+from pylab import show, ogrid, gca
+from mpl_toolkits.mplot3d import Axes3D
+from matplotlib.cbook import get_sample_data
+from matplotlib._png import read_png
 
 
 class VideoPoseTrack:
@@ -115,28 +119,6 @@ class VideoPoseTrack:
                     topn_poses.append(self.poseVecs[start:(start+first_n)])
             
         return topn_poses
-            
-    
-    def disambiguatePersons(self):
-        """
-        Identify the persons by disambiguation. Apply Bipartite Graph Matching.
-        Take list of matrices and for each consecutive pair of them, get the 
-        trajectory of people. Tracks of people over the frames.
-        Where size is (0,) for the list item, ignore (break: person not present)
-        
-        """
-        track_labels = []
-        start = True
-        # Iterate over the frame pose matrices
-        for i, poses in enumerate(self.vid_persons):
-            
-            if poses.shape == (0,):     # no person in frame
-                track_labels.append([])
-                start = True
-                continue
-#            else:
-#                if start:
-#                    #assign new labels
                     
     def visualizeVideoWithBatsman(self):
         """
@@ -262,13 +244,113 @@ class VideoPoseTrack:
         self.vid_tracks = vid_tracks
         self.track_count = track_count
         return vid_tracks, track_count
+            
+    def find_longest_track(self, epsilon=50, bboxes=True, visualize=True):
+        '''
+        '''
+        if not hasattr(self, "vid_tracks"):
+            self.track_poses(epsilon, bboxes, visualize=False)
         
+        tracks = []
+        for idx, (start, end) in enumerate(self.strokes):
+            stroke_tracks = self.vid_tracks[idx]
+            tracks.append(utils.get_track2frame(stroke_tracks))
+        
+        self.tracks = tracks
+        tr_len, pose_ids, stroke_st = [], [], []
+        # find longest track by iterating over the strokes
+        for idx, track in enumerate(tracks):
+            length, pid, stroke_idx  = -1, -1, -1
+            # Iterate over the dictionary values of a stroke
+            for k, v in track.items():
+                if len(v) > length:
+                    length = len(v)
+                    pid = k
+                    stroke_idx = idx
+            tr_len.append(length)
+            pose_ids.append(pid)
+            stroke_st.append(self.strokes[stroke_idx])
+            
+        return tr_len, pose_ids, stroke_st
+            
+    
+    def get_normalized_poses(self, height=360, width=640):
+        '''
+        Represent the poses as keypoints in range [0, 1]
+        '''
+        poseVecsNorm = []
+        for frm_poses in self.poseVecs:
+            poseVecsNorm.append(utils.normalize_pose(frm_poses))
+            
+        self.poseVecsNorm = poseVecsNorm
+        return poseVecsNorm
+    
+    def label_tracks(self, epsilon=50, bboxes=True, visualize=True):
+        '''Visualize complete track and label
+        '''
+        if not hasattr(self, "vid_tracks"):
+            self.track_poses(epsilon, bboxes, visualize=False)
+            
+    def plot_tracks(self, bat_labels, tr_gt_batsman, bboxes=True):
+        if not hasattr(self, "gt_batsman"):
+            self.gt_batsman = utils.getGTBatsmanPoses(bat_labels, tr_gt_batsman)
+        #vid_file : utils.getGTBatsmanPoses(BAT_LABELS, tr_gt_batsman[i])})
+        ax = gca(projection='3d')
+        x, z = ogrid[0:int(360/5), 0:int(640/5)]
+        y = np.atleast_2d(10.0)
+        for start, end in self.strokes:
+            i = start
+            while i<=end:
+                poseFile = self.srcVid+"_{:012}".format(i)+"_keypoints.json"
+                # read the image from the datasetPath only using poseFile name
+                img=utils.getImageFromName(self.datasetPath, poseFile)
+                w, h = img.shape[1], img.shape[0]
+                # draw the pose if the ground truth is available
+                if i in self.gt_batsman.keys():
+                    [x0, y0, x1, y1] = self.gt_batsman[i]
+                    print("Frame : {} :: Boxes : {}".format(i, [x0, y0, x1, y1]))
+                    cv2.rectangle(img, (x0, y0), (x1, y1), [0,255,0], thickness=2)
+                    
+                img = cv2.resize(img, (int(w/5), int(h/5)), interpolation = cv2.INTER_AREA) 
+                norm_img = cv2.normalize(img, None, alpha=0, beta=1, \
+                                    norm_type=cv2.NORM_MINMAX, dtype=cv2.CV_32F)
+                
+                ax.plot_surface(x, y, z, rstride=1, cstride=1, facecolors=norm_img)
+                
+                i+=1
+                break
+#        fn = get_sample_data("lena.png", asfileobj=False)
+#        img = read_png(fn)
+        
+            break
+        show()
+        
+    def disambiguatePersons(self):
+        """
+        Identify the persons by disambiguation. Apply Bipartite Graph Matching.
+        Take list of matrices and for each consecutive pair of them, get the 
+        trajectory of people. Tracks of people over the frames.
+        Where size is (0,) for the list item, ignore (break: person not present)
+        
+        """
+        track_labels = []
+        start = True
+        # Iterate over the frame pose matrices
+        for i, poses in enumerate(self.vid_persons):
+            
+            if poses.shape == (0,):     # no person in frame
+                track_labels.append([])
+                start = True
+                continue
+#            else:
+#                if start:
+#                    #assign new labels
         
     def getPoseMotionFeatures(self):
         """
         Retrieve the L2 difference features of consecutive poses.
         Returns (N-1) list of matrices using the poses matrix.
-        """        
+        """
         pass
     
     

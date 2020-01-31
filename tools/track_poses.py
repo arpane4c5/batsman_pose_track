@@ -127,15 +127,15 @@ def dbscan(poses, epsilon=100, min_samples=10):
     return db
     
     
-def track_stroke_poses(train_lst, tr_labs, epsilon=50, bboxes=True, visualize=True):
+def track_stroke_poses(train_lst, tr_labs, tr_gt_batsman, epsilon=50, bboxes=True, visualize=True):
     '''
     Tracking the poses using the VideoPose class and TrackPose
     
     '''
     track_lst, track_count = [], 0
-    for i, vid_file in enumerate(train_lst):
+    for vid, vid_file in enumerate(train_lst):
         # Create object for one video only
-        v = VideoPoseTrack(DATASET, train_lst[i], POSE_FEATS, tr_labs[i])
+        v = VideoPoseTrack(DATASET, train_lst[vid], POSE_FEATS, tr_labs[vid])
         # Visualize the bounding boxes or keypoints of frame poses, without tracking
 #        v.visualizeVideoWithPoses(bboxes=bboxes)
         # detect tracks based on nearest neighbours with euclidean dist < epsilon
@@ -143,6 +143,16 @@ def track_stroke_poses(train_lst, tr_labs, epsilon=50, bboxes=True, visualize=Tr
                                           visualize=visualize)
         track_lst.append(vid_tracks)
         track_count += count
+        
+        lengths, pids, strokes = v.find_longest_track(epsilon, bboxes, visualize)
+        for i, pid in enumerate(pids):
+            print("Longest track : Pose ID : {} :: Length : {} :: Stroke : {}"\
+                  .format(pid, lengths[i], strokes[i]))
+            
+        normed_poses = v.get_normalized_poses()
+        
+        v.plot_tracks(BAT_LABELS, tr_gt_batsman[vid], bboxes)
+        break
 
     return track_lst, track_count
     
@@ -169,9 +179,9 @@ if __name__ == '__main__':
     sizes = [utils.getTotalFramesVid(os.path.join(DATASET, f)) for f in train_lst]
     print("Size : {}".format(sizes))
     
-    bboxes = False
-    epsilon = 5000
-    visualize = True
+    bboxes = True
+    epsilon = 50
+    visualize = False
     n_clusters = 5
     clust_no = 1
     first_frames = 2
@@ -231,6 +241,8 @@ if __name__ == '__main__':
 #    ###########################################################################
     
     # 2: Track the poses for strokes
-    track_stroke_poses(train_lst, tr_labs, epsilon, bboxes, visualize)
+    track_lst, count = track_stroke_poses(train_lst, tr_labs, tr_gt_batsman, epsilon, bboxes, visualize)
+    
+    #plot_tracks(bboxes)
     
     

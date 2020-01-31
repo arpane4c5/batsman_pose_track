@@ -7,13 +7,35 @@ Created on Wed Jan 22 09:13:36 2020
 """
 import _init_paths
 
+import os
 import torch
 import numpy as np
 import editdistance
 import tqdm
 from matplotlib import pyplot as plt
+from torch.utils.data import DataLoader
 from lib.models import EncoderRNN, DecoderRNN, Seq2Seq
 from lib.datasets import PoseDataset
+from lib.datasets import pad_collate
+from utils import track_utils as utils
+
+# Set the path of the input videos and the openpose extracted features directory
+# Server Paths
+DATASET = "/opt/datasets/cricket/ICC_WT20"
+POSE_FEATS = "/home/arpan/cricket/output_json"
+BAT_LABELS = "/home/arpan/VisionWorkspace/Cricket/batsman_pose_track/batsman_pose_gt"
+LABELS = "/home/arpan/VisionWorkspace/shot_detection/supporting_files/sample_set_labels/sample_labels_shots/ICC WT20"
+#TRAIN_FRAMES = "/home/arpan/VisionWorkspace/Cricket/batsman_detection/ICC_WT20_frames/train"
+#VAL_FRAMES = "/home/arpan/VisionWorkspace/Cricket/batsman_detection/ICC_WT20_frames/val"
+#TEST_FRAMES = "/home/arpan/VisionWorkspace/Cricket/batsman_detection/ICC_WT20_frames/test"
+#ANNOTATION_FILE = "/home/arpan/VisionWorkspace/Cricket/batsman_pose_track/batsman_pose_gt"
+
+# Local Paths
+if not os.path.exists(DATASET):
+    DATASET = "/home/arpan/VisionWorkspace/VideoData/sample_cricket/ICC WT20"
+    POSE_FEATS = "/home/arpan/VisionWorkspace/Cricket/batsman_pose_track/data/output_json"
+    BAT_LABELS = "/home/arpan/VisionWorkspace/Cricket/batsman_pose_track/batsman_pose_gt"
+    LABELS = "/home/arpan/VisionWorkspace/Cricket/scripts/supporting_files/sample_set_labels/sample_labels_shots/ICC WT20"
 
 
 
@@ -73,6 +95,34 @@ def evaluate(model, eval_loader):
     # return {'loss': np.mean(losses), 'cer': np.mean(accs)*100}
     
 if __name__ == '__main__':
+    
+    # Divide the highlight dataset files into training, validation and test sets
+    train_lst, val_lst, test_lst = utils.split_dataset_files(DATASET)
+    print("No. of training videos : {}".format(len(train_lst)))
+    
+    # get list of label filenames containing temporal stroke and batsman labels
+    train_lab = [f.rsplit('.',1)[0] +".json" for f in train_lst]
+    val_lab = [f.rsplit('.',1)[0] +".json" for f in val_lst]
+    test_lab = [f.rsplit('.',1)[0] +".json" for f in test_lst]
+    train_gt_batsman = [f.rsplit('.',1)[0] +"_gt.txt" for f in train_lst]
+    val_gt_batsman = [f.rsplit('.',1)[0] +"_gt.txt" for f in val_lst]
+    test_gt_batsman = [f.rsplit('.',1)[0] +"_gt.txt" for f in test_lst]
+    
+    #####################################################################
+    
+    tr_labs = [os.path.join(LABELS, f) for f in train_lab]
+    val_labs = [os.path.join(LABELS, f) for f in val_lab]
+    tr_gt_batsman = [os.path.join(BAT_LABELS, f) for f in train_gt_batsman]
+    sizes = [utils.getTotalFramesVid(os.path.join(DATASET, f)) for f in train_lst]
+    print("Size : {}".format(sizes))
+    
+    bboxes = True
+    epsilon = 50
+    visualize = False
+    n_clusters = 5
+    clust_no = 1
+    first_frames = 2
+    
     input_size = 75
     output_size = 2
     HIDDEN_SIZE = 1024
@@ -80,12 +130,15 @@ if __name__ == '__main__':
     N_EPOCHS = 10
     USE_CUDA = torch.cuda.is_available()
 
-    dataset = PoseDataset()
+    dataset = PoseDataset(DATASET, POSE_FEATS, train_lst, tr_labs, bboxes=False, \
+                 transforms=None)
+    eval_dataset = PoseDataset(DATASET, POSE_FEATS, val_lst, val_labs, bboxes=False, \
+                 transforms=None)
 #    dataset = ToyDataset(5, 15)
 #    eval_dataset = ToyDataset(5, 15, type='eval')
 #    BATCHSIZE = 30
-    train_loader = data.DataLoader(dataset, batch_size=BATCHSIZE, shuffle=False, collate_fn=pad_collate, drop_last=True)
-    eval_loader = data.DataLoader(eval_dataset, batch_size=BATCHSIZE, shuffle=False, collate_fn=pad_collate,
+    train_loader = DataLoader(dataset, batch_size=BATCHSIZE, shuffle=False, collate_fn=pad_collate, drop_last=True)
+    eval_loader = DataLoader(eval_dataset, batch_size=BATCHSIZE, shuffle=False, collate_fn=pad_collate,
                                   drop_last=True)
     #config["batch_size"] = BATCHSIZE
 
@@ -112,7 +165,7 @@ if __name__ == '__main__':
         elif 'weight' in name:
             torch.nn.init.xavier_normal_(param)
 
-    for epoch in range(n_epochs):
+    for epoch in range(N_EPOCHS):
         run_state = (epoch, N_EPOCHS, FLAGS.train_size)
 
         # Train needs to return model and optimizer, otherwise the model keeps restarting from zero at every epoch
