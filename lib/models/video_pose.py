@@ -74,6 +74,8 @@ class VideoPoseTrack:
         25 (x, y, confidence) pose keypoints.
         
         """
+        if hasattr(self, "poseVecs"):
+            return self.poseVecs
         self.poseVecs = []
         for i in range(self.nFrames):
             poseFile = self.srcVid.rsplit(".", 1)[0]+"_{:012}".format(i)+"_keypoints.json"
@@ -92,6 +94,8 @@ class VideoPoseTrack:
         For N frames, get N matrices of shape (n_persons_in_frame, 4), 
         where 4 is the sequence of (x0, y0, x1, y1) coordinates.
         """
+        if hasattr(self, 'poseBBoxes'):
+            return self.poseBBoxes
         if not hasattr(self, 'poseVecs'):
             self.getPoseFeatures()
             

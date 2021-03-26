@@ -37,7 +37,7 @@ def silence_based_conversion(path = "alice-medium.wav"):
   
         # consider it silent if quieter than -16 dBFS 
         # adjust this per requirement 
-        silence_thresh = -16
+        silence_thresh = -18
     ) 
   
     # create a directory to store the audio chunks. 
@@ -84,7 +84,7 @@ def silence_based_conversion(path = "alice-medium.wav"):
         with sr.AudioFile(file) as source: 
             # remove this if it is not working 
             # correctly. 
-            r.adjust_for_ambient_noise(source) 
+            #r.adjust_for_ambient_noise(source) 
             audio_listened = r.listen(source) 
   
         try: 
@@ -109,7 +109,7 @@ if __name__ == '__main__':
     
     print('Enter the audio file path') 
   
-    path = input() 
+    path = "/home/arpan/VisionWorkspace/Cricket/batsman_pose_track/tools/output-audio.wav"
   
     silence_based_conversion(path) 
 

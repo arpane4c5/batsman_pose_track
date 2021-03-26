@@ -1,9 +1,11 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 """
-Created on Wed Jan 22 09:13:36 2020
+Created on Mon May 18 20:10:39 2020
 
 @author: arpan
+
+@Description: Train GRU on sequence of KTH poses for action recognition.
 """
 import _init_paths
 

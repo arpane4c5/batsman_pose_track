@@ -111,7 +111,7 @@ def getTotalFramesVid(srcVideoPath):
 
     tot_frames = cap.get(cv2.CAP_PROP_FRAME_COUNT)
     cap.release()
-    return tot_frames
+    return int(tot_frames)
 
 def getGTBatsmanPoses(gt_path, gtFile, str_label='Batsman'):
     """
@@ -288,9 +288,9 @@ def get_next_mapping(p1, p2, pid1, next_pid=0, epsilon=20):
     else:
         if p2.shape[0] == 0:
             return []
-        else:
-            # only calculated when both p1 and p2 have rows
-            dist = euclidean_distances(p1, p2)
+    
+    # only calculated when both p1 and p2 have rows
+    dist = euclidean_distances(p1, p2)
     
     # get closest poseNo ordering according to min euclidean distances (row-wise)
     closest_poses = np.argmin(dist, axis = 1)
